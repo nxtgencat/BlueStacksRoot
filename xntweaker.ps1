@@ -1,5 +1,5 @@
 # Define the paths
-$BlueStacksHome = "C:\ProgramData\BlueStacks_nxt"
+$BlueStacksHome = (Get-ItemProperty "HKLM:\SOFTWARE\BlueStacks_nxt").UserDefinedDir
 $BlueStacksConfig = Join-Path $BlueStacksHome "bluestacks.conf"
 $BlueStacksEngine = Join-Path $BlueStacksHome "Engine"
 
@@ -90,15 +90,19 @@ function Modify-BlueStacksConfig {
     
     $content = Get-Content $BlueStacksConfig -Raw
     $content = $content -replace '(bst\.feature\.rooting=")0(")', '${1}1${2}'
-    
     $content = $content -replace "(bst\.instance\.$masterInstance\.enable_root_access=)""?0""?", '$1"1"'
+    
     if ($instance -ne $masterInstance) {
         $content = $content -replace "(bst\.instance\.$instance\.enable_root_access=)""?0""?", '$1"1"'
     }
     
+    # Trim trailing empty lines
+    $content = $content.TrimEnd()
+    
     Set-Content -Path $BlueStacksConfig -Value $content
     Log-Message "Modified BlueStacks config for $instance"
 }
+
 
 # Main script
 Log-Message "Script started"
