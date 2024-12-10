@@ -4,7 +4,8 @@ $BlueStacksInstallDir = (Get-ItemProperty "HKLM:\SOFTWARE\BlueStacks_nxt").Insta
 $DesktopPath = [Environment]::GetFolderPath('Desktop')
 $BlueStacksConfig = Join-Path $BlueStacksHome "bluestacks.conf"
 $BlueStacksEngine = Join-Path $BlueStacksHome "Engine"
-$ProcessName = "HD-MultiInstanceManager"
+$InstanceManagerProcess = "HD-MultiInstanceManager"
+$BlueStacksServiceProcess = "BstkSVC"
 
 # Define the possible instances and their colors
 $Instances = @{
@@ -69,24 +70,29 @@ function Create-BlueStacksShortcut {
 }
 
 function Manage-BlueStacksProcess {
-    
-    # Check if the process is running
-    $process = Get-Process -Name $ProcessName -ErrorAction SilentlyContinue
+    # Array of process names to manage
+    $processes = @($InstanceManagerProcess, $BlueStacksServiceProcess)
 
-    if ($process) {
-        # Display message if the process is running
-        Write-Output "BlueStacks MultiInstanceManager is running."
+    foreach ($processName in $processes) {
+        # Check if the process is running
+        $process = Get-Process -Name $processName -ErrorAction SilentlyContinue
 
-        # Stop the process
-        Stop-Process -Name $ProcessName -Force
+        if ($process) {
+            # Display message if the process is running
+            Write-Output "$processName is running."
 
-        # Confirm the process has been stopped
-        Write-Output "BlueStacks MultiInstanceManager has been stopped."
-    } else {
-        # Display message if the process is not running
-        Write-Output "BlueStacks MultiInstanceManager is not running."
+            # Stop the process
+            Stop-Process -Name $processName -Force
+
+            # Confirm the process has been stopped
+            Write-Output "$processName has been stopped."
+        } else {
+            # Display message if the process is not running
+            Write-Output "$processName is not running."
+        }
     }
 }
+
 
 # Function to modify instance config files
 function Modify-InstanceConfigFiles {
