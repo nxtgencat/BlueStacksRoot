@@ -1,7 +1,10 @@
 # Define the paths
 $BlueStacksHome = (Get-ItemProperty "HKLM:\SOFTWARE\BlueStacks_nxt").UserDefinedDir
+$BlueStacksInstallDir = (Get-ItemProperty "HKLM:\SOFTWARE\BlueStacks_nxt").InstallDir
+$DesktopPath = [Environment]::GetFolderPath('Desktop')
 $BlueStacksConfig = Join-Path $BlueStacksHome "bluestacks.conf"
 $BlueStacksEngine = Join-Path $BlueStacksHome "Engine"
+$ProcessName = "HD-MultiInstanceManager"
 
 # Define the possible instances and their colors
 $Instances = @{
@@ -43,6 +46,46 @@ function Get-AvailableInstances {
         }
     }
     return $availableInstances
+}
+
+function Create-BlueStacksShortcut {
+    # Define the shortcut target and path
+    $ShortcutTargetValue = "$BlueStacksInstallDir\HD-Player.exe --instance $selectedInstance"
+    $ShortcutPath = "$DesktopPath\$selectedInstance.lnk"
+
+    # Create a WScript Shell object
+    $WScriptShell = New-Object -ComObject WScript.Shell
+
+    # Create the shortcut
+    $Shortcut = $WScriptShell.CreateShortcut($ShortcutPath)
+
+    # Set the shortcut properties
+    $Shortcut.TargetPath = "$BlueStacksInstallDir\HD-Player.exe"
+    $Shortcut.Arguments = "--instance $selectedInstance"
+    $Shortcut.WorkingDirectory = $BlueStacksInstallDir
+    $Shortcut.Save()
+
+    Write-Host "Desktop Shortcut created: $selectedInstance"
+}
+
+function Manage-BlueStacksProcess {
+    
+    # Check if the process is running
+    $process = Get-Process -Name $ProcessName -ErrorAction SilentlyContinue
+
+    if ($process) {
+        # Display message if the process is running
+        Write-Output "BlueStacks MultiInstanceManager is running."
+
+        # Stop the process
+        Stop-Process -Name $ProcessName -Force
+
+        # Confirm the process has been stopped
+        Write-Output "BlueStacks MultiInstanceManager has been stopped."
+    } else {
+        # Display message if the process is not running
+        Write-Output "BlueStacks MultiInstanceManager is not running."
+    }
 }
 
 # Function to modify instance config files
@@ -205,11 +248,19 @@ while ($true) {
     Show-SelectedInstance $selectedInstance $masterInstance $selectedInstanceInfo.Color
     Write-Host "$($action.ToUpper()) process started for $selectedInstance..." -ForegroundColor Cyan
     
+    if ($action -eq "root") {
+        Manage-BlueStacksProcess
+    }
+
     # Modify instance config files
     Modify-InstanceConfigFiles $instancePath $masterInstancePath $action
 
     # Modify BlueStacks config
     Modify-BlueStacksConfig $selectedInstance $masterInstance $action
+
+    if ($action -eq "root") {
+        Create-BlueStacksShortcut
+    }
 
     Log-Message "$($action.ToUpper()) process completed for $selectedInstance"
     Write-Host "$($action.ToUpper()) process completed for $selectedInstance" -ForegroundColor Green
