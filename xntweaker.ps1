@@ -115,96 +115,114 @@ function Unmodify-BlueStacksConfig {
 }
 
 
+function Clear-AndShowTitle {
+    Clear-Host
+    Write-Host "=== BlueStacks Root Manager ===" -ForegroundColor Cyan
+    Write-Host ""
+}
+
 # Function to display menu and get user selection
 function Show-Menu {
     param($availableInstances)
-    $index = 1
-    $menuItems = @{}
-
-    foreach ($master in $availableInstances.Keys | Where-Object { $_ -eq $availableInstances[$_].MasterInstance }) {
-        Write-Host "`n$index. $master (Master Instance)"
-        $menuItems[$index] = $master
-        $index++
-
-        foreach ($sub in $availableInstances[$master].Instances | Where-Object { $_ -ne $master }) {
-            Write-Host "   $index. $sub (Sub Instance)"
-            $menuItems[$index] = $sub
-            $index++
-        }
-    }
-
-    Write-Host "`nSelect an instance:"
-    $selection = Read-Host "Enter the number"
     
-    if ($menuItems.ContainsKey([int]$selection)) {
-        return $menuItems[[int]$selection]
-    } else {
-        return $null
+    while ($true) {
+        Clear-AndShowTitle
+        $index = 1
+        $menuItems = @{}
+
+        foreach ($master in $availableInstances.Keys | Where-Object { $_ -eq $availableInstances[$_].MasterInstance }) {
+            Write-Host "`n$index. $master (Master Instance)"
+            $menuItems[$index] = $master
+            $index++
+
+            foreach ($sub in $availableInstances[$master].Instances | Where-Object { $_ -ne $master }) {
+                Write-Host "   $index. $sub (Sub Instance)"
+                $menuItems[$index] = $sub
+                $index++
+            }
+        }
+
+        Write-Host "`n0. Exit"
+
+        Write-Host "`nSelect an instance or exit:"
+        $selection = Read-Host "Enter the number"
+        
+        if ($selection -eq "0") {
+            return "Exit"
+        } elseif ($menuItems.ContainsKey([int]$selection)) {
+            return $menuItems[[int]$selection]
+        } else {
+            Write-Host "Invalid selection. Please try again."
+            Start-Sleep -Seconds 2
+        }
     }
 }
 
 # Function to display action menu (root/unroot)
 function Show-ActionMenu {
-    Write-Host "`n1. Root"
-    Write-Host "2. Unroot"
-    $action = Read-Host "Enter the number"
-    
-    if ($action -eq 1) {
-        return "root"
-    } elseif ($action -eq 2) {
-        return "unroot"
-    } else {
-        return $null
+    while ($true) {
+        Write-Host "`n1. Root"
+        Write-Host "2. Unroot"
+        Write-Host "0. Return to Main Menu"
+        $action = Read-Host "Enter the number"
+        
+        switch ($action) {
+            "1" { return "root" }
+            "2" { return "unroot" }
+            "0" { return "back" }
+            default {
+                Write-Host "Invalid action. Please try again."
+            }
+        }
     }
 }
 
-# Main script
-Log-Message "Script started"
+# Main script loop
+while ($true) {
+    Clear-AndShowTitle
+    $availableInstances = Get-AvailableInstances
+    $selectedInstance = Show-Menu $availableInstances
 
-$availableInstances = Get-AvailableInstances
-$selectedInstance = Show-Menu $availableInstances
+    if ($selectedInstance -eq "Exit") {
+        break
+    }
 
-if ($null -eq $selectedInstance) {
-    Log-Message "Error: Invalid selection. Exiting script."
-    Write-Host "Invalid selection. Press Enter to exit..."
+    $masterInstance = $availableInstances[$selectedInstance].MasterInstance
+    $instancePath = Join-Path $BlueStacksEngine $selectedInstance
+    $masterInstancePath = Join-Path $BlueStacksEngine $masterInstance
+
+    Log-Message "Selected instance: $selectedInstance (Master: $masterInstance)"
+
+    # Show action menu (root/unroot)
+    $action = Show-ActionMenu
+
+    if ($action -eq "back") {
+        continue
+    }
+
+    # Perform the action
+    if ($action -eq "root") {
+        # Modify instance config files
+        Modify-InstanceConfigFiles $instancePath $masterInstancePath
+
+        # Modify BlueStacks config
+        Modify-BlueStacksConfig $selectedInstance $masterInstance
+
+        Log-Message "Rooting process completed for $selectedInstance"
+    } elseif ($action -eq "unroot") {
+        # Modify instance config files
+        Unmodify-InstanceConfigFiles $instancePath $masterInstancePath
+
+        # Modify BlueStacks config
+        Unmodify-BlueStacksConfig $selectedInstance $masterInstance
+
+        Log-Message "Unrooting process completed for $selectedInstance"
+    }
+
+    Write-Host "`nProcess completed. Press Enter to continue..."
     Read-Host
-    exit
 }
 
-$masterInstance = $availableInstances[$selectedInstance].MasterInstance
-$instancePath = Join-Path $BlueStacksEngine $selectedInstance
-$masterInstancePath = Join-Path $BlueStacksEngine $masterInstance
-
-Log-Message "Selected instance: $selectedInstance (Master: $masterInstance)"
-
-# Show action menu (root/unroot)
-$action = Show-ActionMenu
-
-if ($null -eq $action) {
-    Log-Message "Error: Invalid action. Exiting script."
-    Write-Host "Invalid action. Press Enter to exit..."
-    Read-Host
-    exit
-}
-
-# Perform the action
-if ($action -eq "root") {
-    # Modify instance config files
-    Modify-InstanceConfigFiles $instancePath $masterInstancePath
-
-    # Modify BlueStacks config
-    Modify-BlueStacksConfig $selectedInstance $masterInstance
-
-    Log-Message "Rooting process completed for $selectedInstance"
-} elseif ($action -eq "unroot") {
-    # Modify instance config files
-    Unmodify-InstanceConfigFiles $instancePath $masterInstancePath
-
-    # Modify BlueStacks config
-    Unmodify-BlueStacksConfig $selectedInstance $masterInstance
-
-    Log-Message "Unrooting process completed for $selectedInstance"
-}
-
-Write-Host "`nProcess completed. Press Enter to exit..."
+Write-Host "Exiting script. Press Enter to close..."
 Read-Host
+
