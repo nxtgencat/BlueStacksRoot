@@ -121,7 +121,13 @@ function Clear-AndShowTitle {
     Write-Host ""
 }
 
-# Function to display menu and get user selection
+function Show-SelectedInstance {
+    param($selectedInstance, $masterInstance)
+    Clear-AndShowTitle
+    Write-Host "Selected instance: $selectedInstance (Master: $masterInstance)" -ForegroundColor Yellow
+    Write-Host ""
+}
+
 function Show-Menu {
     param($availableInstances)
     
@@ -132,12 +138,18 @@ function Show-Menu {
 
         foreach ($master in $availableInstances.Keys | Where-Object { $_ -eq $availableInstances[$_].MasterInstance }) {
             Write-Host "`n$index. $master (Master Instance)"
-            $menuItems[$index] = $master
+            $menuItems[$index] = @{
+                Instance = $master
+                Master = $master
+            }
             $index++
 
             foreach ($sub in $availableInstances[$master].Instances | Where-Object { $_ -ne $master }) {
                 Write-Host "   $index. $sub (Sub Instance)"
-                $menuItems[$index] = $sub
+                $menuItems[$index] = @{
+                    Instance = $sub
+                    Master = $master
+                }
                 $index++
             }
         }
@@ -148,7 +160,10 @@ function Show-Menu {
         $selection = Read-Host "Enter the number"
         
         if ($selection -eq "0") {
-            return "Exit"
+            return @{
+                Instance = "Exit"
+                Master = "Exit"
+            }
         } elseif ($menuItems.ContainsKey([int]$selection)) {
             return $menuItems[[int]$selection]
         } else {
@@ -158,10 +173,11 @@ function Show-Menu {
     }
 }
 
-# Function to display action menu (root/unroot)
 function Show-ActionMenu {
+    param($selectedInstance, $masterInstance)
     while ($true) {
-        Write-Host "`n1. Root"
+        Show-SelectedInstance $selectedInstance $masterInstance
+        Write-Host "1. Root"
         Write-Host "2. Unroot"
         Write-Host "0. Return to Main Menu"
         $action = Read-Host "Enter the number"
@@ -172,6 +188,7 @@ function Show-ActionMenu {
             "0" { return "back" }
             default {
                 Write-Host "Invalid action. Please try again."
+                Start-Sleep -Seconds 2
             }
         }
     }
@@ -181,27 +198,30 @@ function Show-ActionMenu {
 while ($true) {
     Clear-AndShowTitle
     $availableInstances = Get-AvailableInstances
-    $selectedInstance = Show-Menu $availableInstances
+    $selectedInstanceInfo = Show-Menu $availableInstances
 
-    if ($selectedInstance -eq "Exit") {
+    if ($selectedInstanceInfo.Instance -eq "Exit") {
         break
     }
 
-    $masterInstance = $availableInstances[$selectedInstance].MasterInstance
+    $selectedInstance = $selectedInstanceInfo.Instance
+    $masterInstance = $selectedInstanceInfo.Master
     $instancePath = Join-Path $BlueStacksEngine $selectedInstance
     $masterInstancePath = Join-Path $BlueStacksEngine $masterInstance
 
     Log-Message "Selected instance: $selectedInstance (Master: $masterInstance)"
 
     # Show action menu (root/unroot)
-    $action = Show-ActionMenu
+    $action = Show-ActionMenu $selectedInstance $masterInstance
 
     if ($action -eq "back") {
         continue
     }
 
     # Perform the action
+    Show-SelectedInstance $selectedInstance $masterInstance
     if ($action -eq "root") {
+        Write-Host "Rooting process started for $selectedInstance..."
         # Modify instance config files
         Modify-InstanceConfigFiles $instancePath $masterInstancePath
 
@@ -209,7 +229,9 @@ while ($true) {
         Modify-BlueStacksConfig $selectedInstance $masterInstance
 
         Log-Message "Rooting process completed for $selectedInstance"
+        Write-Host "Rooting process completed for $selectedInstance" -ForegroundColor Green
     } elseif ($action -eq "unroot") {
+        Write-Host "Unrooting process started for $selectedInstance..."
         # Modify instance config files
         Unmodify-InstanceConfigFiles $instancePath $masterInstancePath
 
@@ -217,6 +239,7 @@ while ($true) {
         Unmodify-BlueStacksConfig $selectedInstance $masterInstance
 
         Log-Message "Unrooting process completed for $selectedInstance"
+        Write-Host "Unrooting process completed for $selectedInstance" -ForegroundColor Green
     }
 
     Write-Host "`nProcess completed. Press Enter to continue..."
